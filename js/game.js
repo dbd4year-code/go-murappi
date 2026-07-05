@@ -515,6 +515,9 @@
       walk.forEach((path, i) => paths[`enemy_${name}_walk_${i}`] = path);
       if (enemy?.defeated) paths[`enemy_${name}_defeated`] = enemy.defeated;
     });
+    Object.entries(CFG.assets.items || {}).forEach(([name, path]) => {
+      if (path) paths[`item_${name}`] = path;
+    });
     Object.entries(TILE_DEFS).forEach(([id, def]) => {
       if (def.image) paths[`tile_${id}`] = def.image;
     });
@@ -647,6 +650,21 @@
       if (this.playCustom("gameOver", fallback)) return;
       fallback();
     }
+    item(type) {
+      const key = type === "heart" ? "itemHeart" : type === "life" ? "itemLife" : "itemAirJump";
+      const fallback = () => {
+        if (type === "heart") {
+          this.tone(660, .12, "sine", .055, 0, 880);
+          this.tone(880, .16, "triangle", .045, .07, 1100);
+        } else if (type === "life") {
+          [523, 659, 784, 1047].forEach((f, i) => this.tone(f, .22, "triangle", .055, i * .07));
+        } else {
+          [620, 780, 980].forEach((f, i) => this.tone(f, .18, "sine", .045, i * .055, f * 1.18));
+        }
+      };
+      if (this.playCustom(key, fallback)) return;
+      fallback();
+    }
     startBgm(stage = null) {
       this.stopBgm();
       if (!this.enabled) return;
@@ -715,6 +733,7 @@
     piyoppiTrail: [],
     tileRuntime: null,
     enemies: [],
+    items: [],
     particles: [],
     cameraX: 0,
     time: 0,
@@ -787,6 +806,7 @@
       colliders: [],
       hazards: [],
       enemySpawns: [],
+      itemSpawns: [],
       startX: 180,
       startMarkerBottom: GROUND_Y,
       goalX: stage.length - 180
@@ -805,6 +825,13 @@
             markerY: rect.y,
             markerBottom: rect.y + map.tileSize,
             type: def.enemyType
+          });
+        } else if (def.object === "item") {
+          runtime.itemSpawns.push({
+            x: rect.x + map.tileSize * .5 - 29,
+            y: rect.y + map.tileSize * .5 - 29,
+            type: def.itemType || "heart",
+            tileId: id
           });
         } else if (def.object === "start") {
           runtime.startX = rect.x + map.tileSize * .28;
@@ -848,6 +875,19 @@
       phase: index * 1.73 + Math.random() * 2,
       direction: index % 2 ? 1 : -1,
       score: spawn.type === "toge" ? 220 : spawn.type === "shizuku" ? 180 : spawn.type === "puni" ? 150 : 120
+    };
+  }
+
+  function createItem(spawn, index) {
+    return {
+      ...spawn,
+      x: Number(spawn.x),
+      y: Number(spawn.y),
+      w: 58,
+      h: 58,
+      state: "active",
+      animTime: Math.random() * 2,
+      phase: index * 1.37 + Math.random() * Math.PI * 2
     };
   }
 
@@ -899,10 +939,13 @@
       runFrame: 0,
       deathSpin: 0,
       edgeCatchTimer: 0,
-      edgeCatchCooldown: 0
+      edgeCatchCooldown: 0,
+      airJumpBoostTimer: 0,
+      airJumpBoostDisplaySecond: 0
     };
     resetPiyoppiTrail();
     game.enemies = game.tileRuntime.enemySpawns.map(createEnemy);
+    game.items = game.tileRuntime.itemSpawns.map(createItem);
     game.particles = [];
     game.cameraX = Math.max(0, game.player.x - 180);
     game.stageTime = 0;
@@ -951,7 +994,8 @@
   function updateHud() {
     ui.score.textContent = padScore(game.score);
     ui.best.textContent = padScore(game.highScore);
-    ui.stage.textContent = `${game.stageIndex + 1} / ${game.stages.length}`;
+    const boostSeconds = Math.max(0, Math.ceil(Number(game.player?.airJumpBoostTimer) || 0));
+    ui.stage.textContent = `${game.stageIndex + 1} / ${game.stages.length}${boostSeconds > 0 ? `　JUMP+ ${boostSeconds}s` : ""}`;
     ui.lives.textContent = `×${Math.max(0, game.lives)}`;
     ui.hp.textContent = "♥".repeat(Math.max(0, game.hp)) + "♡".repeat(Math.max(0, CFG.gameplay.maxHp - game.hp));
     ui.hp.setAttribute("aria-label", `体力${game.hp}`);
@@ -1093,6 +1137,14 @@
     }
   }
 
+  function getEffectiveMaxJumps(player = game.player) {
+    const normal = Math.max(1, Number(CFG.gameplay.maxJumps) || 2);
+    if (player && Number(player.airJumpBoostTimer) > 0) {
+      return Math.max(normal, Number(CFG.gameplay.airJumpBoostMaxJumps) || 3);
+    }
+    return normal;
+  }
+
   function performJump(doubleJump = false) {
     const p = game.player;
     const wasGrounded = p.grounded || game.coyote > 0;
@@ -1105,7 +1157,7 @@
     p.edgeCatchTimer = 0;
     p.stompTimer = 0;
     p.grounded = false;
-    p.jumpsUsed = Math.min(CFG.gameplay.maxJumps || 2, p.jumpsUsed + 1);
+    p.jumpsUsed = Math.min(getEffectiveMaxJumps(p), p.jumpsUsed + 1);
     game.coyote = 0;
     game.jumpBuffer = 0;
     if (doubleJump || !wasGrounded) {
@@ -1209,6 +1261,8 @@
     game.player.deathSpin = 0;
     game.player.edgeCatchTimer = 0;
     game.player.edgeCatchCooldown = 0;
+    game.player.airJumpBoostTimer = 0;
+    game.player.airJumpBoostDisplaySecond = 0;
     game.death = null;
     game.state = "playing";
     resetPiyoppiTrail();
@@ -1522,13 +1576,20 @@
     p.stompTimer = Math.max(0, Number(p.stompTimer || 0) - dt);
     p.edgeCatchTimer = Math.max(0, Number(p.edgeCatchTimer || 0) - dt);
     p.edgeCatchCooldown = Math.max(0, Number(p.edgeCatchCooldown || 0) - dt);
+    if (p.airJumpBoostTimer > 0) {
+      const before = Math.ceil(p.airJumpBoostTimer);
+      p.airJumpBoostTimer = Math.max(0, p.airJumpBoostTimer - dt);
+      const after = Math.ceil(p.airJumpBoostTimer);
+      if (after !== before) updateHud();
+      if (before > 0 && after === 0) toast("空中ジャンプ強化が終了しました");
+    }
     game.jumpBuffer = Math.max(0, game.jumpBuffer - dt);
     game.coyote = p.grounded ? CFG.gameplay.coyoteTime : Math.max(0, game.coyote - dt);
 
     if (game.jumpBuffer > 0 && p.hurtTimer <= 0) {
       if (p.grounded || game.coyote > 0) {
         performJump(false);
-      } else if (p.jumpsUsed < (CFG.gameplay.maxJumps || 2)) {
+      } else if (p.jumpsUsed < getEffectiveMaxJumps(p)) {
         // 足場からそのまま落ちた場合は、未使用の1段目を空中から使える。
         // すでに1回跳んでいる場合だけ2段ジャンプとして扱う。
         performJump(p.jumpsUsed > 0);
@@ -1590,6 +1651,8 @@
     }
 
     updateEnemies(dt);
+    updateItems(dt);
+    checkItemCollisions();
     checkEnemyCollisions();
     updateParticles(dt);
 
@@ -1600,6 +1663,68 @@
     game.cameraX = lerp(game.cameraX, targetCamera, 1 - Math.pow(.0009, dt));
 
     if (p.x >= (game.tileRuntime?.goalX || game.stage.length - 230) - 60) stageClear();
+  }
+
+  function updateItems(dt) {
+    for (const item of game.items) {
+      if (item.state !== "active") continue;
+      item.animTime += dt;
+    }
+  }
+
+  function checkItemCollisions() {
+    const p = game.player;
+    if (!p || game.state !== "playing") return;
+    const box = getPlayerHitbox();
+    for (const item of game.items) {
+      if (item.state !== "active") continue;
+      const bob = Math.sin(item.animTime * 3.2 + item.phase) * 6;
+      const itemBox = { x: item.x + 7, y: item.y + bob + 7, w: item.w - 14, h: item.h - 14 };
+      if (!rectsOverlap(box, itemBox)) continue;
+      collectItem(item);
+    }
+  }
+
+  function collectItem(item) {
+    item.state = "collected";
+    const p = game.player;
+    const baseScore = Math.max(0, Number(CFG.gameplay.itemPickupScore) || 100);
+    let message = "アイテムGET！";
+    let color = "#fff2a8";
+
+    if (item.type === "heart") {
+      if (game.hp < CFG.gameplay.maxHp) {
+        game.hp += 1;
+        message = "体力が1回復！";
+      } else {
+        message = `体力満タン　+${baseScore}`;
+      }
+      color = "#ff9eb1";
+    } else if (item.type === "life") {
+      const maxLives = Math.max(1, Number(CFG.gameplay.maxLives) || 99);
+      if (game.lives < maxLives) {
+        game.lives += 1;
+        message = "残機が1増えました！";
+      } else {
+        message = `残機は上限です　+${baseScore}`;
+      }
+      color = "#ffe67a";
+    } else if (item.type === "airJump") {
+      p.airJumpBoostTimer = Math.max(.5, Number(CFG.gameplay.airJumpBoostDuration) || 10);
+      p.airJumpBoostDisplaySecond = Math.ceil(p.airJumpBoostTimer);
+      message = `空中ジャンプが2回に強化！ ${Math.ceil(p.airJumpBoostTimer)}秒`;
+      color = "#9eeaff";
+    }
+
+    addScore(baseScore);
+    updateHud();
+    spawnBurst(item.x + item.w / 2, item.y + item.h / 2, 18, color);
+    game.particles.push({
+      x: item.x + item.w / 2, y: item.y + item.h / 2, vx: 0, vy: 0,
+      life: .34, maxLife: .34, size: 20, color, gravity: 0, type: "ring"
+    });
+    audio.item(item.type);
+    toast(message);
   }
 
   function updateEnemies(dt) {
@@ -1905,6 +2030,7 @@
       drawPlatforms(stage, cameraX);
     }
     drawGoal(stage, cameraX);
+    drawItems(cameraX);
     drawEnemies(cameraX);
     drawPiyoppi(cameraX);
     drawPlayer(cameraX);
@@ -2030,6 +2156,56 @@
       ctx.beginPath(); ctx.arc(0, 328, 20 + Math.sin(game.time * 4) * 2, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+  }
+
+  function drawItemFallback(context, type, x, y, size) {
+    context.save();
+    context.translate(x + size / 2, y + size / 2);
+    if (type === "heart") {
+      context.fillStyle = "#f05b78";
+      context.beginPath();
+      context.moveTo(0, size * .28);
+      context.bezierCurveTo(-size * .48, -size * .02, -size * .42, -size * .38, -size * .16, -size * .35);
+      context.bezierCurveTo(0, -size * .33, 0, -size * .18, 0, -size * .11);
+      context.bezierCurveTo(0, -size * .18, 0, -size * .33, size * .16, -size * .35);
+      context.bezierCurveTo(size * .42, -size * .38, size * .48, -size * .02, 0, size * .28);
+      context.fill();
+    } else {
+      context.fillStyle = type === "life" ? "#f4c64e" : "#5bc8e8";
+      context.beginPath();
+      context.arc(0, 0, size * .42, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = "#ffffff";
+      context.font = `900 ${type === "life" ? size * .28 : size * .34}px "Yu Gothic", sans-serif`;
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(type === "life" ? "1UP" : "J+", 0, 1);
+    }
+    context.restore();
+  }
+
+  function drawItems(cameraX) {
+    for (const item of game.items) {
+      if (item.state !== "active") continue;
+      const x = item.x - cameraX;
+      if (x < -100 || x > BASE_W + 100) continue;
+      const bob = Math.sin(item.animTime * 3.2 + item.phase) * 6;
+      const pulse = 1 + Math.sin(item.animTime * 5 + item.phase) * .045;
+      const key = item.type === "heart" ? "heart" : item.type === "life" ? "life" : "airJump";
+      const image = assets[`item_${key}`] || assets[`tile_item_${item.type === "airJump" ? "air_jump" : item.type}`];
+      ctx.save();
+      ctx.translate(x + item.w / 2, item.y + bob + item.h / 2);
+      ctx.scale(pulse, pulse);
+      ctx.shadowColor = item.type === "heart" ? "rgba(240,91,120,.48)" : item.type === "life" ? "rgba(244,198,78,.52)" : "rgba(91,200,232,.52)";
+      ctx.shadowBlur = 16;
+      if (image && image.complete && image.naturalWidth) {
+        ctx.drawImage(image, -item.w / 2, -item.h / 2, item.w, item.h);
+      } else {
+        ctx.shadowBlur = 0;
+        drawItemFallback(ctx, item.type, -item.w / 2, -item.h / 2, item.w);
+      }
+      ctx.restore();
+    }
   }
 
   function drawEnemies(cameraX) {
@@ -2296,10 +2472,16 @@
         preview.textContent = "×";
         button.appendChild(preview);
       } else {
+        const fallback = document.createElement("span");
+        fallback.textContent = def.fallbackText || "?";
+        fallback.style.cssText = "display:none;place-items:center;width:100%;aspect-ratio:1/1;border-radius:10px;background:#eef7f4;color:#176f60;font-weight:900;font-size:24px;";
         const image = document.createElement("img");
         image.src = def.image || "";
         image.alt = "";
+        image.addEventListener("error", () => { image.style.display = "none"; fallback.style.display = "grid"; }, { once: true });
         button.appendChild(image);
+        button.appendChild(fallback);
+        if (!def.image) { image.style.display = "none"; fallback.style.display = "grid"; }
       }
 
       const label = document.createElement("span");
@@ -2353,7 +2535,7 @@
     ui.deletePattern.disabled = locked;
     ui.savePattern.disabled = locked;
     ui.patternFormNote.textContent = locked
-      ? "このパターンは敵・スタート・ゴールなどのシステム用です。ゲーム進行に必要なため編集・削除できません。"
+      ? "このパターンは敵・アイテム・スタート・ゴールなどのシステム用です。ゲーム進行に必要なため編集・削除できません。"
       : "画像、名称、分類、当たり判定を変更できます。変更内容はこの端末内へ保存されます。";
   }
 
@@ -2780,6 +2962,20 @@
           } else {
             ec.drawImage(image, x, y, cell, cell);
           }
+        } else if (def.object) {
+          ec.save();
+          ec.fillStyle = "rgba(112,82,159,.14)";
+          ec.fillRect(x + 2, y + 2, cell - 4, cell - 4);
+          if (def.object === "item") {
+            drawItemFallback(ec, def.itemType, x + 9, y + 7, cell - 18);
+          } else {
+            ec.fillStyle = "#6f54a0";
+            ec.font = '900 18px "Yu Gothic", sans-serif';
+            ec.textAlign = "center";
+            ec.textBaseline = "middle";
+            ec.fillText(def.fallbackText || "?", x + cell / 2, y + cell / 2);
+          }
+          ec.restore();
         }
         const collisionColor = {
           none: "#8eb8dc",

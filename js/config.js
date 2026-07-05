@@ -1,5 +1,5 @@
 window.GO_MURAPPI_CONFIG = {
-  version: "1.6.3",
+  version: "1.6.4",
   storageKeys: {
     highScore: "go_murappi_high_score_v1",
     ranking: "go_murappi_local_ranking_v1",
@@ -14,6 +14,12 @@ window.GO_MURAPPI_CONFIG = {
     jumpVelocity: -660,
     doubleJumpVelocity: -620,
     maxJumps: 2,
+    // 空中ジャンプ強化アイテム使用中は、地上ジャンプに加えて空中で2回まで跳べる（合計3回）。
+    airJumpBoostMaxJumps: 3,
+    airJumpBoostDuration: 10.0,
+    // 残機アイテムで増やせる上限。
+    maxLives: 99,
+    itemPickupScore: 100,
     // タップ時間に応じた可変ジャンプ。1が最小、5が最大。
     jumpPowerMaxLevel: 5,
     // 0.32秒以上の長押しを最大ジャンプとして扱う。
@@ -111,6 +117,12 @@ window.GO_MURAPPI_CONFIG = {
       }
     },
     // 標準ファイル名。ファイルが存在しない場合は内蔵Web Audio音へ自動フォールバックします。
+    items: {
+      // ステージ編集から配置できるアイテム画像。未配置時はゲーム内の簡易図形で代用します。
+      heart: "assets/items/item_heart.png",
+      life: "assets/items/item_life.png",
+      airJump: "assets/items/item_air_jump.png"
+    },
     audio: {
       bgm: "assets/audio/bgm.mp3",
       jump: "assets/audio/jump.mp3",
@@ -121,7 +133,10 @@ window.GO_MURAPPI_CONFIG = {
       // 旧設定との互換用。通常は空文字のままでよい。
       hurt: "",
       clear: "",
-      gameOver: "assets/audio/gameover.mp3"
+      gameOver: "assets/audio/gameover.mp3",
+      itemHeart: "assets/audio/item_heart.mp3",
+      itemLife: "assets/audio/item_life.mp3",
+      itemAirJump: "assets/audio/item_air_jump.mp3"
     }
   },
   tileEditor: {
@@ -234,6 +249,36 @@ window.GO_MURAPPI_CONFIG = {
         object: "enemy",
         enemyType: "shizuku",
         image: "assets/enemies/shizuku_walk_1.png"
+      },
+      item_heart: {
+        locked: true,
+        label: "アイテム：ハート",
+        category: "アイテム",
+        collision: "object",
+        object: "item",
+        itemType: "heart",
+        fallbackText: "♥",
+        image: "assets/items/item_heart.png"
+      },
+      item_life: {
+        locked: true,
+        label: "アイテム：残機UP",
+        category: "アイテム",
+        collision: "object",
+        object: "item",
+        itemType: "life",
+        fallbackText: "1UP",
+        image: "assets/items/item_life.png"
+      },
+      item_air_jump: {
+        locked: true,
+        label: "アイテム：空中ジャンプ強化",
+        category: "アイテム",
+        collision: "object",
+        object: "item",
+        itemType: "airJump",
+        fallbackText: "J+",
+        image: "assets/items/item_air_jump.png"
       },
       start: {
         locked: true,
