@@ -1,0 +1,29 @@
+{
+  "name": "GO！むらっぴ",
+  "short_name": "GO！むらっぴ",
+  "description": "むらっぴとぴよっぴが村上記念病院をめざす横スクロールアクションゲーム",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#dff3eb",
+  "theme_color": "#176f60",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "assets/ui/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/ui/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "id": "./",
+  "scope": "./",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "prefer_related_applications": false
+}

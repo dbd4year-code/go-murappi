@@ -1,0 +1,7 @@
+MP3を利用する場合は、このフォルダーへファイルを配置し、js/config.js の assets.audio へパスを指定してください。
+
+例：
+jump: "assets/audio/jump.mp3"
+damage: "assets/audio/damage.mp3"
+death: "assets/audio/death.mp3"
+goal: "assets/audio/goal.mp3"

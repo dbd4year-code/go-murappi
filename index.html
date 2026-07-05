@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f6657">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GO！むらっぴ">
+  <title>GO！むらっぴ</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/ui/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/ui/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="gameShell" aria-label="GO！むらっぴ ゲーム画面">
+    <canvas id="gameCanvas" width="1280" height="720" aria-label="横スクロールアクションゲーム"></canvas>
+
+    <section id="hud" class="hud is-hidden" aria-live="polite">
+      <div class="hud-card score-card">
+        <span class="hud-label">SCORE</span>
+        <strong id="scoreValue">000000</strong>
+      </div>
+      <div class="hud-card">
+        <span class="hud-label">BEST</span>
+        <strong id="bestValue">000000</strong>
+      </div>
+      <div class="hud-card stage-card">
+        <span class="hud-label">STAGE</span>
+        <strong id="stageValue">1 / 5</strong>
+      </div>
+      <div class="hud-card status-card">
+        <span class="hud-label">残機</span>
+        <strong id="livesValue">×3</strong>
+        <span class="hud-label hp-label">体力</span>
+        <span id="hpValue" class="hearts" aria-label="体力3">♥♥♥</span>
+      </div>
+      <button id="titleButton" class="icon-button home-button" type="button" aria-label="タイトルへ戻る" title="タイトルへ戻る">⌂</button>
+      <button id="pauseButton" class="icon-button" type="button" aria-label="一時停止">Ⅱ</button>
+      <button id="soundButton" class="icon-button" type="button" aria-label="サウンド切り替え">♪</button>
+    </section>
+
+    <section id="titleScreen" class="screen-panel">
+      <div class="title-art">
+        <img class="title-murappi" src="assets/characters/murappi_threequarter.png" alt="むらっぴ">
+        <div class="title-copy">
+          <p class="eyebrow">ぴよっぴと病院をめざそう！</p>
+          <h1>GO！<span>むらっぴ</span></h1>
+          <p class="tagline">タップでジャンプ。空中でもう一度タップして2段ジャンプ！</p>
+          <div class="best-box">
+            <span>最高スコア</span>
+            <strong id="titleBestValue">000000</strong>
+          </div>
+          <button id="startButton" class="primary-button" type="button">プレイ開始</button>
+          <div class="title-actions">
+            <button id="installButton" class="secondary-button install-button" type="button">スマホに追加</button>
+            <button id="rankingButton" class="secondary-button" type="button">ランキング</button>
+            <button id="editorButton" class="secondary-button" type="button">ステージ編集</button>
+            <button id="titleSoundButton" class="secondary-button" type="button">サウンド ON</button>
+          </div>
+          <p class="tap-note">プレイ中は画面のどこをタップしてもジャンプ。空中で再タップすると2段ジャンプします。</p>
+        </div>
+        <img class="title-piyoppi" src="assets/characters/piyoppi_front.png" alt="ぴよっぴ">
+      </div>
+    </section>
+
+    <section id="messageScreen" class="screen-panel overlay-panel is-hidden">
+      <div class="message-card">
+        <p id="messageKicker" class="eyebrow"></p>
+        <h2 id="messageTitle"></h2>
+        <p id="messageBody"></p>
+        <button id="messageButton" class="primary-button" type="button">つづける</button>
+      </div>
+    </section>
+
+    <section id="endingScreen" class="screen-panel ending-panel is-hidden">
+      <div class="ending-content">
+        <p class="eyebrow">ALL STAGES CLEAR</p>
+        <h2>ただいま、村上記念病院。</h2>
+        <p class="ending-text">転んでも、傷ついても、むらっぴは前へ進みました。<br>そばには、ずっとぴよっぴがいました。</p>
+        <div class="ending-score">
+          <span>FINAL SCORE</span>
+          <strong id="endingScoreValue">000000</strong>
+          <small id="endingBestLabel"></small>
+        </div>
+        <p class="ending-last">小さな一歩が、誰かの安心につながっていく。<br>明日も一緒に、病院へ。</p>
+        <div class="ending-actions">
+          <button id="shareButton" class="secondary-button" type="button">スコアを共有</button>
+          <button id="endingTitleButton" class="primary-button" type="button">タイトルへ</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="modalBackdrop" class="modal-backdrop is-hidden" aria-modal="true" role="dialog">
+      <div id="installModal" class="modal-card install-modal is-hidden">
+        <div class="modal-head">
+          <h2>スマホに追加</h2>
+          <button class="close-button" data-close-modal type="button" aria-label="閉じる">×</button>
+        </div>
+        <div id="installInstructions" class="install-guide"></div>
+        <button id="installActionButton" class="primary-button install-action-button" type="button">インストール</button>
+      </div>
+
+      <div id="rankingModal" class="modal-card is-hidden">
+        <div class="modal-head">
+          <h2>ランキング</h2>
+          <button class="close-button" data-close-modal type="button" aria-label="閉じる">×</button>
+        </div>
+        <p class="modal-help">端末内の上位記録です。外部ランキングAPIを設定すると、共通ランキングへ接続できます。</p>
+        <ol id="rankingList" class="ranking-list"></ol>
+      </div>
+
+      <div id="editorModal" class="modal-card editor-modal is-hidden">
+        <div class="modal-head">
+          <div>
+            <h2>かんたんステージ編集</h2>
+            <p class="modal-help editor-lead">パレットから画像を選び、マップをタップまたはドラッグして配置します。</p>
+          </div>
+          <button class="close-button" data-close-modal type="button" aria-label="閉じる">×</button>
+        </div>
+
+        <div class="editor-settings">
+          <label>編集する面
+            <select id="editorStageSelect" aria-label="編集するステージ"></select>
+          </label>
+          <label>ステージ名
+            <input id="editorTitleInput" type="text" maxlength="30">
+          </label>
+          <label>走る速さ
+            <input id="editorSpeedInput" type="number" min="180" max="480" step="5">
+          </label>
+          <label>横幅（マス）
+            <input id="editorColumnsInput" type="number" min="20" max="100" step="1">
+          </label>
+          <label>ゲーム本編への反映
+            <select id="editorIncludeInput">
+              <option value="true">ゲームに入れる</option>
+              <option value="false">一時保存のみ（下書き）</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="editor-stage-actions">
+          <button id="newStageButton" class="secondary-button compact-button" type="button">新規ステージ</button>
+          <button id="deleteStageButton" class="danger-button compact-button" type="button">この面を削除</button>
+          <button id="saveDraftStageButton" class="secondary-button compact-button" type="button">一時保存（本編に入れない）</button>
+        </div>
+
+        <div class="editor-workspace">
+          <aside class="palette-panel">
+            <h3>配置するパターン</h3>
+            <div id="tilePalette" class="tile-palette" aria-label="パターン画像一覧"></div>
+            <div id="selectedTileInfo" class="selected-tile-info"></div>
+
+            <details id="patternManager" class="pattern-manager">
+              <summary>パターンを追加・編集</summary>
+              <div id="patternForm" class="pattern-form">
+                <div class="pattern-preview-box">
+                  <img id="patternPreview" alt="選択中のパターンプレビュー">
+                  <span id="patternPreviewEmpty">画像を選択</span>
+                </div>
+                <label>パターン名
+                  <input id="patternNameInput" type="text" maxlength="30" placeholder="例：レンガの地面">
+                </label>
+                <label>分類
+                  <input id="patternCategoryInput" type="text" maxlength="20" list="patternCategoryList" placeholder="背景・地形など">
+                  <datalist id="patternCategoryList">
+                    <option value="背景"></option>
+                    <option value="地形"></option>
+                    <option value="危険"></option>
+                    <option value="装飾"></option>
+                  </datalist>
+                </label>
+                <label>当たり判定
+                  <select id="patternCollisionSelect">
+                    <option value="none">通過する</option>
+                    <option value="platform">上に乗れる</option>
+                    <option value="solid">上に乗れる・横からぶつかる</option>
+                    <option value="void">足場なし・落下する</option>
+                    <option value="hazard">接触するとダメージ</option>
+                  </select>
+                </label>
+                <label class="secondary-button file-button pattern-file-button">画像を選択
+                  <input id="patternImageInput" type="file" accept="image/png,image/webp,image/jpeg">
+                </label>
+                <p id="patternImageName" class="pattern-file-name">PNG・WebP・JPEG／最大8MB</p>
+                <div class="pattern-actions">
+                  <button id="newPatternButton" class="secondary-button compact-button" type="button">新規追加</button>
+                  <button id="savePatternButton" class="primary-button compact-button" type="button">設定を保存</button>
+                  <button id="deletePatternButton" class="danger-button compact-button" type="button">削除</button>
+                </div>
+                <button id="resetPatternsButton" class="secondary-button compact-button pattern-reset-button" type="button">標準パターンを復元</button>
+                <p id="patternFormNote" class="pattern-form-note">敵・スタート・ゴールはゲーム進行に必要なため編集できません。</p>
+              </div>
+            </details>
+          </aside>
+          <section class="map-panel">
+            <div class="map-toolbar">
+              <button id="editorUndoButton" class="secondary-button compact-button" type="button">1つ戻す</button>
+              <button id="fillGroundButton" class="secondary-button compact-button" type="button">地面を一括配置</button>
+              <button id="clearMapButton" class="danger-button compact-button" type="button">全消去</button>
+              <span>横にスクロールできます</span>
+            </div>
+            <div class="map-scroll" id="mapEditorScroll">
+              <canvas id="mapEditorCanvas" width="1200" height="348" aria-label="ステージマップ編集エリア"></canvas>
+            </div>
+            <div class="collision-legend" aria-label="判定の説明">
+              <span><b class="legend-pass"></b>通過</span>
+              <span><b class="legend-platform"></b>上に乗れる</span>
+              <span><b class="legend-solid"></b>上に乗れる・横からぶつかる</span>
+              <span><b class="legend-void"></b>穴：画面外まで落ちるとミス</span>
+              <span><b class="legend-hazard"></b>接触ダメージ</span>
+            </div>
+          </section>
+        </div>
+
+        <details class="advanced-editor">
+          <summary>上級者向け：JSONを直接編集</summary>
+          <p class="modal-help">通常は触る必要はありません。マップ編集内容と連動します。</p>
+          <textarea id="stageEditor" spellcheck="false" aria-label="ステージ設定JSON"></textarea>
+          <button id="applyJsonButton" class="secondary-button compact-button" type="button">JSONをマップへ反映</button>
+        </details>
+
+        <p id="editorStatus" class="editor-status"></p>
+        <div class="editor-actions">
+          <button id="saveStagesButton" class="primary-button" type="button">全ステージを保存</button>
+          <button id="testStageButton" class="secondary-button" type="button">この面をテスト</button>
+          <button id="exportStagesButton" class="secondary-button" type="button">マップ一式を書き出し</button>
+          <label class="secondary-button file-button">マップ一式を読み込み<input id="importStagesInput" type="file" accept=".json,application/json"></label>
+          <button id="resetStagesButton" class="danger-button" type="button">初期状態へ戻す</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="portraitHint" class="portrait-hint">
+      <strong>横向き推奨</strong>
+      <span>端末を横向きにすると、前方が見やすくなります。</span>
+    </div>
+
+    <div id="toast" class="toast is-hidden" role="status"></div>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/stages.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+GO！むらっぴ Version 1.6.2
+
+- むらっぴの踏みつけ専用1コマ画像に対応
+- assets/characters/murappi_stomp.png を追加指定可能
+- 踏みつけ画像未配置時は murappi_jump.png へ自動フォールバック
+- 踏みつけポーズ表示時間を設定可能化（stompPoseTime）
+- 音声の標準MP3パスを明文化
+- MP3読込失敗時に内蔵音へ戻る処理を追加
+- 素材仕様一覧 ASSET_SPECIFICATION.md を追加

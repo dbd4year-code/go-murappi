@@ -1,0 +1,8 @@
+BGM、効果音、追加画像をこのフォルダーへ配置できます。
+
+・キャラクター／敵画像：js/config.js の assets を変更
+・ステージ用パターン画像：js/config.js の tileEditor.definitions へ追加
+・BGM／効果音：js/config.js の assets.audio を変更
+
+敵画像は透過PNGを推奨します。
+ステージ用パターン画像は正方形PNGを推奨します。
