@@ -1,4 +1,4 @@
-const CACHE_NAME = "go-murappi-v1-6-3-variable-jump";
+const CACHE_NAME = ""go-murappi-v1-6-3-assets-2";
 const APP_SHELL = [
   './',
   './index.html',
