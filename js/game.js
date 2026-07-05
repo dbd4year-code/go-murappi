@@ -720,6 +720,11 @@
     time: 0,
     stageTime: 0,
     jumpBuffer: 0,
+    jumpInputHeld: false,
+    jumpInputStartedAt: 0,
+    jumpInputDuration: 0,
+    jumpInputPointerId: null,
+    jumpKeyHeld: false,
     coyote: 0,
     shake: 0,
     hitStop: 0,
@@ -884,6 +889,10 @@
       vy: 0,
       grounded: true,
       jumpsUsed: 0,
+      jumpHoldActive: false,
+      jumpHoldElapsed: 0,
+      jumpPowerLevel: 1,
+      jumpWasDouble: false,
       invuln: 0,
       hurtTimer: 0,
       stompTimer: 0,
@@ -898,6 +907,7 @@
     game.cameraX = Math.max(0, game.player.x - 180);
     game.stageTime = 0;
     game.jumpBuffer = 0;
+    resetJumpInput();
     game.coyote = 0;
     game.shake = 0;
     game.hitStop = 0;
@@ -915,6 +925,7 @@
   }
 
   function showTitle() {
+    resetJumpInput();
     game.state = "title";
     game.testMode = false;
     game.testStageSnapshot = null;
@@ -988,15 +999,108 @@
     updateHud();
   }
 
+  function getJumpPowerLevel(durationSeconds) {
+    const maxLevel = Math.max(1, Number(CFG.gameplay.jumpPowerMaxLevel) || 5);
+    const configured = Array.isArray(CFG.gameplay.jumpPowerLevelTimes)
+      ? CFG.gameplay.jumpPowerLevelTimes.map(Number).filter(Number.isFinite)
+      : [];
+    const maxTime = Math.max(.05, Number(CFG.gameplay.jumpHoldMaxTime) || .32);
+    const times = configured.length >= maxLevel
+      ? configured.slice(0, maxLevel)
+      : Array.from({ length: maxLevel }, (_, i) => maxTime * (i + 1) / maxLevel);
+    const duration = clamp(Number(durationSeconds) || 0, 0, maxTime);
+    for (let i = 0; i < times.length; i++) {
+      if (duration <= times[i] + .0001) return i + 1;
+    }
+    return maxLevel;
+  }
+
+  function getJumpReleaseFactor(level, doubleJump = false) {
+    const maxLevel = Math.max(1, Number(CFG.gameplay.jumpPowerMaxLevel) || 5);
+    const source = doubleJump
+      ? CFG.gameplay.doubleJumpReleaseVelocityFactors
+      : CFG.gameplay.jumpReleaseVelocityFactors;
+    const fallback = [0.32, 0.42, 0.54, 0.69, 1];
+    const factors = Array.isArray(source) && source.length >= maxLevel ? source : fallback;
+    return clamp(Number(factors[Math.max(0, Math.min(maxLevel - 1, level - 1))]) || 1, .12, 1);
+  }
+
+  function resetJumpInput() {
+    game.jumpInputHeld = false;
+    game.jumpInputStartedAt = 0;
+    game.jumpInputDuration = 0;
+    game.jumpInputPointerId = null;
+    game.jumpKeyHeld = false;
+    if (game.player) {
+      game.player.jumpHoldActive = false;
+      game.player.jumpHoldElapsed = 0;
+      game.player.jumpPowerLevel = 1;
+    }
+  }
+
   function queueJump() {
     if (game.state !== "playing") return;
     game.jumpBuffer = CFG.gameplay.jumpBufferTime;
+  }
+
+  function beginJumpInput(pointerId = null) {
+    if (game.state !== "playing" || game.jumpInputHeld) return;
+    game.jumpInputHeld = true;
+    game.jumpInputStartedAt = performance.now();
+    game.jumpInputDuration = 0;
+    game.jumpInputPointerId = pointerId;
+    queueJump();
+  }
+
+  function applyJumpRelease(durationSeconds = game.jumpInputDuration) {
+    const p = game.player;
+    if (!p || !p.jumpHoldActive) return;
+    const maxTime = Math.max(.05, Number(CFG.gameplay.jumpHoldMaxTime) || .32);
+    const duration = clamp(Number(durationSeconds) || 0, 0, maxTime);
+    const level = getJumpPowerLevel(duration);
+    p.jumpHoldElapsed = duration;
+    p.jumpPowerLevel = level;
+    p.jumpHoldActive = false;
+    if (p.vy < 0) {
+      p.vy *= getJumpReleaseFactor(level, p.jumpWasDouble);
+    }
+  }
+
+  function endJumpInput(pointerId = null) {
+    if (!game.jumpInputHeld) return;
+    if (pointerId !== null && game.jumpInputPointerId !== null && pointerId !== game.jumpInputPointerId) return;
+    const elapsed = Math.max(0, (performance.now() - game.jumpInputStartedAt) / 1000);
+    const maxTime = Math.max(.05, Number(CFG.gameplay.jumpHoldMaxTime) || .32);
+    game.jumpInputDuration = Math.min(maxTime, elapsed);
+    game.jumpInputHeld = false;
+    game.jumpInputPointerId = null;
+    applyJumpRelease(game.jumpInputDuration);
+  }
+
+  function updateVariableJump(dt) {
+    const p = game.player;
+    if (!p || !p.jumpHoldActive) return;
+    const maxTime = Math.max(.05, Number(CFG.gameplay.jumpHoldMaxTime) || .32);
+    if (game.jumpInputHeld) {
+      p.jumpHoldElapsed = Math.min(maxTime, p.jumpHoldElapsed + dt);
+      p.jumpPowerLevel = getJumpPowerLevel(p.jumpHoldElapsed);
+      if (p.jumpHoldElapsed >= maxTime || p.vy >= 0) {
+        p.jumpPowerLevel = Math.max(1, Number(CFG.gameplay.jumpPowerMaxLevel) || 5);
+        p.jumpHoldActive = false;
+      }
+    } else {
+      applyJumpRelease(game.jumpInputDuration);
+    }
   }
 
   function performJump(doubleJump = false) {
     const p = game.player;
     const wasGrounded = p.grounded || game.coyote > 0;
     p.vy = doubleJump ? (CFG.gameplay.doubleJumpVelocity || CFG.gameplay.jumpVelocity) : CFG.gameplay.jumpVelocity;
+    p.jumpHoldActive = true;
+    p.jumpHoldElapsed = 0;
+    p.jumpPowerLevel = 1;
+    p.jumpWasDouble = !!doubleJump;
     // 穴の縁に引っ掛かっている最中でも、タップすれば即座に脱出ジャンプへ移行する。
     p.edgeCatchTimer = 0;
     p.stompTimer = 0;
@@ -1014,6 +1118,8 @@
       spawnDust(p.x + 34, p.y + p.h - 6, 6, "#fff4d3");
     }
     audio.jump(doubleJump);
+    // ごく短いタップで、ジャンプ成立前に指を離していた場合もレベル1～5を反映する。
+    if (!game.jumpInputHeld) applyJumpRelease(game.jumpInputDuration);
   }
 
   function playerHit() {
@@ -1023,6 +1129,7 @@
     p.invuln = CFG.gameplay.hurtInvincibility;
     p.hurtTimer = .42;
     p.stompTimer = 0;
+    p.jumpHoldActive = false;
     p.vy = -360;
     p.x = Math.max(120, p.x - 55);
     game.shake = Math.max(game.shake, 12);
@@ -1052,6 +1159,7 @@
     p.grounded = false;
     p.hurtTimer = 0;
     p.stompTimer = 0;
+    resetJumpInput();
     p.invuln = 0;
     p.deathSpin = 0;
     p.vy = -690;
@@ -1093,6 +1201,9 @@
     game.player.prevY = game.player.y;
     game.player.vy = 0;
     game.player.jumpsUsed = 0;
+    game.player.jumpHoldActive = false;
+    game.player.jumpHoldElapsed = 0;
+    game.player.jumpPowerLevel = 1;
     game.player.invuln = 2.0;
     game.player.grounded = true;
     game.player.deathSpin = 0;
@@ -1130,6 +1241,7 @@
 
   function stageClear() {
     if (game.state !== "playing") return;
+    resetJumpInput();
     game.state = "stageclear";
     audio.stopBgm();
     audio.clear();
@@ -1430,6 +1542,7 @@
     resolveHorizontalTileCollision(previousX);
 
     const previousTop = p.prevY + 13;
+    updateVariableJump(dt);
     p.vy += CFG.gameplay.gravity * dt;
     p.y += p.vy * dt;
     resolveCeilingTileCollision(previousTop, p.y + 13);
@@ -1447,6 +1560,9 @@
       p.vy = 0;
       p.grounded = true;
       p.jumpsUsed = 0;
+      p.jumpHoldActive = false;
+      p.jumpHoldElapsed = 0;
+      p.jumpPowerLevel = 1;
       game.coyote = CFG.gameplay.coyoteTime;
 
       if (edgeCatch) {
@@ -1543,6 +1659,7 @@
     game.player.y = enemy.y - game.player.h + 8;
     game.player.vy = CFG.gameplay.stompBounceVelocity;
     game.player.stompTimer = Math.max(.06, Number(CFG.gameplay.stompPoseTime) || .16);
+    game.player.jumpHoldActive = false;
     game.player.grounded = false;
     game.player.jumpsUsed = 1;
     game.combo = game.comboTimer > 0 ? game.combo + 1 : 1;
@@ -2901,6 +3018,7 @@
 
   function togglePause() {
     if (game.state === "playing") {
+      resetJumpInput();
       game.state = "paused";
       audio.stopBgm();
       showMessage("PAUSE", "ひと休み", "準備ができたら、また走り出そう。", "再開", () => {
@@ -2929,18 +3047,45 @@
     window.addEventListener("online", () => toast("オンラインに戻りました"));
     window.addEventListener("offline", () => toast("オフラインでプレイできます"));
     window.addEventListener("resize", resizeCanvas, { passive: true });
-    canvas.addEventListener("pointerdown", async (event) => {
+    canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
-      await audio.unlock();
-      queueJump();
+      if (game.jumpInputHeld) return;
+      canvas.setPointerCapture?.(event.pointerId);
+      beginJumpInput(event.pointerId);
+      // 初回タップでもpointerupより先に入力状態を確定させ、短いタップを取りこぼさない。
+      audio.unlock();
     }, { passive: false });
+    const finishPointerJump = (event) => {
+      if (game.jumpInputPointerId !== null) endJumpInput(event?.pointerId ?? null);
+      if (event?.pointerId !== undefined && canvas.hasPointerCapture?.(event.pointerId)) {
+        canvas.releasePointerCapture?.(event.pointerId);
+      }
+    };
+    canvas.addEventListener("pointerup", finishPointerJump, { passive: true });
+    canvas.addEventListener("pointercancel", finishPointerJump, { passive: true });
+    window.addEventListener("pointerup", finishPointerJump, { passive: true });
+    window.addEventListener("pointercancel", finishPointerJump, { passive: true });
     window.addEventListener("keydown", (event) => {
       if (event.code === "Space" || event.code === "ArrowUp") {
         event.preventDefault();
-        queueJump();
+        if (!event.repeat && !game.jumpKeyHeld) {
+          game.jumpKeyHeld = true;
+          beginJumpInput(null);
+        }
       } else if (event.code === "Escape") {
         togglePause();
       }
+    });
+    window.addEventListener("keyup", (event) => {
+      if (event.code === "Space" || event.code === "ArrowUp") {
+        event.preventDefault();
+        game.jumpKeyHeld = false;
+        endJumpInput(null);
+      }
+    });
+    window.addEventListener("blur", () => {
+      if (game.jumpInputHeld) endJumpInput(null);
+      game.jumpKeyHeld = false;
     });
     document.addEventListener("visibilitychange", () => {
       if (document.hidden && game.state === "playing") togglePause();

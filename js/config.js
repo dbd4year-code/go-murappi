@@ -1,5 +1,5 @@
 window.GO_MURAPPI_CONFIG = {
-  version: "1.6.2",
+  version: "1.6.3",
   storageKeys: {
     highScore: "go_murappi_high_score_v1",
     ranking: "go_murappi_local_ranking_v1",
@@ -14,6 +14,15 @@ window.GO_MURAPPI_CONFIG = {
     jumpVelocity: -660,
     doubleJumpVelocity: -620,
     maxJumps: 2,
+    // タップ時間に応じた可変ジャンプ。1が最小、5が最大。
+    jumpPowerMaxLevel: 5,
+    // 0.32秒以上の長押しを最大ジャンプとして扱う。
+    jumpHoldMaxTime: 0.32,
+    // 各レベルの上限時間（秒）。配列の順番がレベル1～5。
+    jumpPowerLevelTimes: [0.06, 0.12, 0.18, 0.24, 0.32],
+    // 指を離した瞬間に、上昇速度へ掛ける係数。短いタップほど早く上昇を止める。
+    jumpReleaseVelocityFactors: [0.32, 0.42, 0.54, 0.69, 1.00],
+    doubleJumpReleaseVelocityFactors: [0.36, 0.47, 0.59, 0.73, 1.00],
     stompBounceVelocity: -505,
     // 敵を踏みつけた直後に、専用1コマ画像を表示する時間。
     stompPoseTime: 0.16,
