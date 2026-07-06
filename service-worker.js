@@ -1,4 +1,4 @@
-const CACHE_NAME = "go-murappi-v1-6-4-items";
+const CACHE_NAME = "go-murappi-v1-6-4-items-2";
 const APP_SHELL = [
   './',
   './index.html',
