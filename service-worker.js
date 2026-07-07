@@ -1,4 +1,4 @@
-const CACHE_NAME = "go-murappi-v1-6-4-items-3";
+const CACHE_NAME = "go-murappi-v1-6-5-clear-pose";
 const APP_SHELL = [
   './',
   './index.html',
@@ -11,6 +11,8 @@ const APP_SHELL = [
   './assets/characters/murappi_hurt.png',
   './assets/characters/murappi_defeated.png',
   './assets/characters/murappi_jump.png',
+  './assets/characters/murappi_clear_1.png',
+  './assets/characters/murappi_clear_2.png',
   './assets/characters/murappi_run_1.png',
   './assets/characters/murappi_run_2.png',
   './assets/characters/murappi_run_3.png',

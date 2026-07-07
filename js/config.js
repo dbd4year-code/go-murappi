@@ -1,5 +1,5 @@
 window.GO_MURAPPI_CONFIG = {
-  version: "1.6.4",
+  version: "1.6.5",
   storageKeys: {
     highScore: "go_murappi_high_score_v1",
     ranking: "go_murappi_local_ranking_v1",
@@ -56,7 +56,11 @@ window.GO_MURAPPI_CONFIG = {
     fallLimit: 720,
     stageClearBonus: 1500,
     remainingHpBonus: 250,
-    remainingLifeBonus: 600
+    remainingLifeBonus: 600,
+    // ゴール後、次のステージ案内を出す前に喜びポーズを取る時間（秒）。
+    stageClearPoseTime: 3.0,
+    // 喜びポーズ2コマの切り替え速度（1秒あたりのコマ数）。
+    stageClearPoseFps: 4
   },
   assets: {
     murappi: {
@@ -70,6 +74,11 @@ window.GO_MURAPPI_CONFIG = {
       jump: "assets/characters/murappi_jump.png",
       // 敵を踏みつけた瞬間の専用1コマ。ファイルが無い場合はjump画像へ自動フォールバック。
       stomp: "assets/characters/murappi_stomp.png",
+      // ステージクリア後の喜びポーズ2コマ。未配置時は idle 画像へフォールバック。
+      celebrate: [
+        "assets/characters/murappi_clear_1.png",
+        "assets/characters/murappi_clear_2.png"
+      ],
       hurt: "assets/characters/murappi_hurt.png",
       // 残機を失う演出専用。別PNGへ差し替え可能。
       defeated: "assets/characters/murappi_defeated.png"

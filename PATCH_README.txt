@@ -1,23 +1,17 @@
-GO！むらっぴ Version 1.6.4 差分パッチ
+GO！むらっぴ Version 1.6.5 パッチ適用手順
 
-【上書きするファイル】
-js/config.js
-js/game.js
-service-worker.js
+1. 現在使用中のゲーム本体フォルダを開きます。
+2. この差分パッチ内の以下3ファイルを上書きしてください。
 
-【上書きしないもの】
-assetsフォルダー全体
-index.html
-styles.css
-js/stages.js
+   js/config.js
+   js/game.js
+   service-worker.js
 
-【追加機能】
-・ステージ編集からハート、残機UP、空中ジャンプ強化を配置
-・ハートは体力を1回復
-・残機UPは残機を1増加
-・空中ジャンプ強化は10秒間、空中で2回まで追加ジャンプ可能
-・アイテム画像が無い場合は内蔵の簡易表示を使用
-・アイテムごとのMP3効果音に対応
-・オンライン時はGitHub Pages上の最新画像を優先するキャッシュ方式へ変更
+3. assets フォルダは上書きしません。
+4. 喜びポーズ画像を使う場合は、任意で以下を配置してください。
 
-詳細はREADME.mdおよびASSET_SPECIFICATION.mdを参照してください。
+   assets/characters/murappi_clear_1.png
+   assets/characters/murappi_clear_2.png
+
+5. GitHub Pages へ反映後、Android Chrome で公開ページを2回再読み込みし、
+   ホーム画面版アプリも完全終了してから再起動してください。

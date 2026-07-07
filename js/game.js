@@ -509,6 +509,7 @@
       piyoppiIdle: CFG.assets.piyoppi.idle
     };
     CFG.assets.murappi.run.forEach((path, i) => paths[`murappiRun${i}`] = path);
+    (CFG.assets.murappi.celebrate || []).forEach((path, i) => paths[`murappiCelebrate${i}`] = path);
     CFG.assets.piyoppi.hop.forEach((path, i) => paths[`piyoppiHop${i}`] = path);
     Object.entries(CFG.assets.enemies).forEach(([name, enemy]) => {
       const walk = Array.isArray(enemy?.walk) ? enemy.walk : [enemy];
@@ -941,8 +942,12 @@
       edgeCatchTimer: 0,
       edgeCatchCooldown: 0,
       airJumpBoostTimer: 0,
-      airJumpBoostDisplaySecond: 0
+      airJumpBoostDisplaySecond: 0,
+      clearPoseTimer: 0,
+      clearPoseFrame: 0
     };
+    game.pendingStageClearMessage = null;
+    game.stageClearBonusValue = 0;
     resetPiyoppiTrail();
     game.enemies = game.tileRuntime.enemySpawns.map(createEnemy);
     game.items = game.tileRuntime.itemSpawns.map(createItem);
@@ -1264,6 +1269,7 @@
     game.player.airJumpBoostTimer = 0;
     game.player.airJumpBoostDisplaySecond = 0;
     game.death = null;
+    game.pendingStageClearMessage = null;
     game.state = "playing";
     resetPiyoppiTrail();
     game.cameraX = Math.max(0, game.player.x - 260);
@@ -1549,6 +1555,29 @@
     audio.tickBgm();
     if (game.state === "dying") {
       updateDeathAnimation(Math.min(dt, .033));
+      return;
+    }
+    if (game.state === "stageclearpose") {
+      const stepDt = Math.min(dt, .033);
+      game.time += stepDt;
+      game.stageTime += stepDt;
+      game.shake = Math.max(0, game.shake - 32 * stepDt);
+      game.comboTimer -= stepDt;
+      if (game.comboTimer <= 0) game.combo = 0;
+      const p = game.player;
+      p.invuln = Math.max(0, p.invuln - stepDt);
+      p.runFrame += stepDt * Math.max(1, Number(CFG.gameplay.stageClearPoseFps) || 4);
+      p.clearPoseTimer = Math.max(0, Number(p.clearPoseTimer || 0) - stepDt);
+      updateParticles(stepDt);
+      recordPiyoppiTrail();
+      const targetCamera = clamp(p.x - 265, 0, Math.max(0, game.stage.length - BASE_W + 170));
+      game.cameraX = lerp(game.cameraX, targetCamera, 1 - Math.pow(.0009, stepDt));
+      if (p.clearPoseTimer <= 0) {
+        const next = game.pendingStageClearMessage;
+        game.pendingStageClearMessage = null;
+        game.state = "stageclear";
+        if (typeof next === "function") next();
+      }
       return;
     }
     if (game.state !== "playing") {
@@ -2245,18 +2274,24 @@
     const flicker = p.invuln > 0 && Math.floor(p.invuln * 14) % 2 === 0;
     if (flicker) ctx.globalAlpha = .38;
     let image;
+    const celebrateFrames = Array.isArray(CFG.assets.murappi.celebrate) ? CFG.assets.murappi.celebrate.length : 0;
     if (game.state === "dying") image = assets.murappiDefeated || assets.murappiHurt || assets.murappiIdle;
+    else if (game.state === "stageclearpose") {
+      const fps = Math.max(1, Number(CFG.gameplay.stageClearPoseFps) || 4);
+      const frameIndex = celebrateFrames > 0 ? (Math.floor(p.runFrame) % celebrateFrames) : 0;
+      image = assets[`murappiCelebrate${frameIndex}`] || assets.murappiIdle;
+    }
     else if (p.hurtTimer > 0) image = assets.murappiHurt;
     else if (p.stompTimer > 0) image = assets.murappiStomp || assets.murappiJump;
     else if (!p.grounded) image = assets.murappiJump;
     else image = assets[`murappiRun${Math.floor(p.runFrame) % CFG.assets.murappi.run.length}`] || assets.murappiIdle;
 
-    const drawH = game.state === "dying" ? 174 : (!p.grounded ? 176 : 168 + Math.sin(p.runFrame * Math.PI) * 3);
+    const drawH = game.state === "dying" ? 174 : (game.state === "stageclearpose" ? 172 : (!p.grounded ? 176 : 168 + Math.sin(p.runFrame * Math.PI) * 3));
     const ratio = image ? image.width / image.height : .5;
     const drawW = drawH * ratio;
     const tilt = game.state === "dying"
       ? p.deathSpin
-      : p.hurtTimer > 0 ? -10 : !p.grounded ? clamp(p.vy / 110, -7, 10) : Math.sin(p.runFrame * Math.PI) * 1.6;
+      : game.state === "stageclearpose" ? Math.sin(p.runFrame * Math.PI) * 2.2 : p.hurtTimer > 0 ? -10 : !p.grounded ? clamp(p.vy / 110, -7, 10) : Math.sin(p.runFrame * Math.PI) * 1.6;
     ctx.save();
     ctx.translate(x + p.w / 2, p.y + p.h);
     ctx.rotate(tilt * Math.PI / 180);
